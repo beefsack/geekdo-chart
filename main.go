@@ -11,11 +11,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var sess *r.Session
-
 func main() {
-	var err error
-	sess, err = r.Connect(r.ConnectOpts{
+	sess, err := r.Connect(r.ConnectOpts{
 		Address:  "localhost:28015",
 		Database: "geekdorankchart",
 	})
@@ -23,16 +20,25 @@ func main() {
 		log.Fatal("Error connecting to database, ", err)
 	}
 	router := mux.NewRouter()
-	router.HandleFunc("/{type}/{ids}", ChartHandler)
-	router.HandleFunc("/", HomeHandler)
+	router.HandleFunc("/{type}/{ids}", HandlerWithDB(sess, ChartHandler))
+	router.HandleFunc("/", HandlerWithDB(sess, HomeHandler))
 	http.ListenAndServe(":3000", router)
 }
 
-func HomeHandler(wr http.ResponseWriter, req *http.Request) {
+func HandlerWithDB(
+	sess *r.Session,
+	handler func(wr http.ResponseWriter, req *http.Request, sess *r.Session),
+) func(wr http.ResponseWriter, req *http.Request) {
+	return func(wr http.ResponseWriter, req *http.Request) {
+		handler(wr, req, sess)
+	}
+}
+
+func HomeHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
 	wr.Write([]byte("hello"))
 }
 
-func ChartHandler(wr http.ResponseWriter, req *http.Request) {
+func ChartHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
 	vars := mux.Vars(req)
 	ids := []int{}
 	idMap := map[int]bool{} // Store which IDs have been parsed for uniqueness
