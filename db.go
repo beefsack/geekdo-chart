@@ -103,7 +103,6 @@ func LoadThing(kind string, id int, sess *r.Session) (Thing, error) {
 		// We don't have ranks or the ranks are old, fetch more.
 		page := 1 + (l / RatingsPerPage)
 		for {
-			log.Printf("Loading page %d for %s %d", page, kind, id)
 			things, err := client.Thing(kind, id, geekdo.ThingOptions{
 				Historical: true,
 				Page:       page,
@@ -120,7 +119,7 @@ func LoadThing(kind string, id int, sess *r.Session) (Thing, error) {
 			}
 			ratings := item.Statistics.Ratings
 			if ratings == nil {
-				return thing, errors.New("no ratings fetched")
+				break
 			}
 			for _, rating := range ratings {
 				if rating.Ranks == nil || len(rating.Ranks) == 0 {

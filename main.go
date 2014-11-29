@@ -1,6 +1,7 @@
 package main
 
 import (
+	"html/template"
 	"log"
 	"net/http"
 	"strconv"
@@ -8,7 +9,6 @@ import (
 	"sync"
 
 	r "github.com/dancannon/gorethink"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/mux"
 )
 
@@ -39,7 +39,7 @@ func HandlerWithDB(
 }
 
 func HomeHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
-	wr.Write([]byte("hello"))
+	wr.Write([]byte(`<html><body><h1>Try <a href="/boardgame/154203,150376,147020,148228,157354,148949">this`))
 }
 
 func ChartHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
@@ -77,7 +77,20 @@ func ChartHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
 	}
 	wg.Wait()
 	if overallErr != nil {
-		log.Fatalf("Error loading thing, %v", overallErr)
+		log.Printf("Error loading thing, %v", overallErr)
+		wr.WriteHeader(500)
+		wr.Write([]byte("Unable to load"))
+		return
 	}
-	spew.Dump(things)
+	graphs, dataProvider, err := ChartJson(things)
+	if err != nil {
+		log.Printf("Error getting chart JSON, %v", err)
+		wr.WriteHeader(500)
+		wr.Write([]byte("Unable to generate chart data, possible because no ranks were available"))
+		return
+	}
+	parsedTemplate.Execute(wr, struct{ Graphs, DataProvider interface{} }{
+		Graphs:       template.JS(graphs),
+		DataProvider: template.JS(dataProvider),
+	})
 }
