@@ -1,13 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	r "github.com/dancannon/gorethink"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/mux"
 )
 
@@ -17,10 +18,13 @@ func main() {
 		Database: "geekdorankchart",
 	})
 	if err != nil {
-		log.Fatal("Error connecting to database, ", err)
+		log.Fatalf("Error connecting to database, %v", err)
+	}
+	if err := migrate(sess); err != nil {
+		log.Fatalf("Error migrating database, %v", err)
 	}
 	router := mux.NewRouter()
-	router.HandleFunc("/{type}/{ids}", HandlerWithDB(sess, ChartHandler))
+	router.HandleFunc("/{kind}/{ids}", HandlerWithDB(sess, ChartHandler))
 	router.HandleFunc("/", HandlerWithDB(sess, HomeHandler))
 	http.ListenAndServe(":3000", router)
 }
@@ -39,7 +43,9 @@ func HomeHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
 }
 
 func ChartHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
+	var overallErr error
 	vars := mux.Vars(req)
+	kind := vars["kind"]
 	ids := []int{}
 	idMap := map[int]bool{} // Store which IDs have been parsed for uniqueness
 	for _, idStr := range strings.Split(vars["ids"], ",") {
@@ -55,6 +61,23 @@ func ChartHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
 		idMap[id] = true
 		ids = append(ids, id)
 	}
-	wr.Write([]byte(vars["type"]))
-	wr.Write([]byte(fmt.Sprintf("%v", ids)))
+	// Load from DB
+	things := []Thing{}
+	wg := sync.WaitGroup{}
+	for _, id := range ids {
+		wg.Add(1)
+		go func(id int) {
+			thing, err := LoadThing(kind, id, sess)
+			if err != nil {
+				overallErr = err
+			}
+			things = append(things, thing)
+			wg.Done()
+		}(id)
+	}
+	wg.Wait()
+	if overallErr != nil {
+		log.Fatalf("Error loading thing, %v", overallErr)
+	}
+	spew.Dump(things)
 }
