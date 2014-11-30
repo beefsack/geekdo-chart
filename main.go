@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/GeertJohan/go.rice"
+	"github.com/beefsack/go-geekdo"
 	r "github.com/dancannon/gorethink"
 	"github.com/gorilla/mux"
 )
@@ -31,6 +33,7 @@ func main() {
 	router := mux.NewRouter()
 	router.Handle("/assets/{rest:.*}", http.StripPrefix("/assets/",
 		http.FileServer(rice.MustFindBox("assets").HTTPBox())))
+	router.HandleFunc("/search/{query}", SearchHandler)
 	router.HandleFunc("/{kind}/{ids}", Handler(sess, tmpl, ChartHandler))
 	router.HandleFunc("/", Handler(sess, tmpl, HomeHandler))
 	http.ListenAndServe(":3000", router)
@@ -116,4 +119,41 @@ func ChartHandler(
 		Graphs:       template.JS(graphs),
 		DataProvider: template.JS(dataProvider),
 	})
+}
+
+func SearchHandler(wr http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	query := vars["query"]
+	if query == "" {
+		wr.WriteHeader(400)
+		wr.Write([]byte("You must provide a query"))
+		return
+	}
+	kinds := req.URL.Query().Get("kinds")
+	kindStrs := []string{}
+	if kinds != "" {
+		kindStrs = strings.Split(kinds, ",")
+	}
+	things, err := client.Search(query, geekdo.SearchOptions{
+		Kinds: kindStrs,
+	})
+	if err != nil {
+		log.Printf("Error searching, %v", err)
+		wr.WriteHeader(500)
+		wr.Write([]byte("Unable to search via the Geekdo API right now"))
+		return
+	}
+	wr.Header().Set("Content-Type", "application/json")
+	result := []map[string]interface{}{}
+	for _, t := range things.Items {
+		result = append(result, map[string]interface{}{
+			"type": t.Type,
+			"id":   t.Id,
+			"name": t.Names[0].Value,
+		})
+	}
+	enc := json.NewEncoder(wr)
+	if err := enc.Encode(result); err != nil {
+		log.Printf("Error encoding JSON, %v", err)
+	}
 }
