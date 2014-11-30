@@ -26,31 +26,25 @@ func main() {
 	if err := migrate(sess); err != nil {
 		log.Fatalf("Error migrating database, %v", err)
 	}
-	tmpl, err := parseTemplates()
-	if err != nil {
-		log.Fatalf("Error parsing templates, %v", err)
-	}
 	router := mux.NewRouter()
 	router.Handle("/assets/{rest:.*}", http.StripPrefix("/assets/",
 		http.FileServer(rice.MustFindBox("assets").HTTPBox())))
 	router.HandleFunc("/search", SearchHandler)
-	router.HandleFunc("/{ids}", Handler(sess, tmpl, ChartHandler))
+	router.HandleFunc("/{ids}", Handler(sess, ChartHandler))
 	router.HandleFunc("/", HomeHandler)
 	http.ListenAndServe(":3000", router)
 }
 
 func Handler(
 	sess *r.Session,
-	tmpl *template.Template,
 	handler func(
 		wr http.ResponseWriter,
 		req *http.Request,
 		sess *r.Session,
-		tmpl *template.Template,
 	),
 ) func(wr http.ResponseWriter, req *http.Request) {
 	return func(wr http.ResponseWriter, req *http.Request) {
-		handler(wr, req, sess, tmpl)
+		handler(wr, req, sess)
 	}
 }
 
@@ -62,7 +56,6 @@ func ChartHandler(
 	wr http.ResponseWriter,
 	req *http.Request,
 	sess *r.Session,
-	tmpl *template.Template,
 ) {
 	var overallErr error
 	vars := mux.Vars(req)
@@ -118,7 +111,7 @@ func ChartHandler(
 		wr.Write([]byte("Unable to generate chart data, possible because no ranks were available"))
 		return
 	}
-	tmpl.ExecuteTemplate(wr, "chart.tmpl", struct {
+	ExecuteTemplate(wr, "chart.tmpl", struct {
 		Graphs, DataProvider interface{}
 		Things               []Thing
 	}{

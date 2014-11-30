@@ -2,31 +2,26 @@ package main
 
 import (
 	"html/template"
-	"os"
-	"strings"
+	"io"
 
 	"github.com/GeertJohan/go.rice"
 )
 
-func parseTemplates() (*template.Template, error) {
+var tmpl = template.New("")
+
+func ExecuteTemplate(wr io.Writer, name string, data interface{}) error {
 	box, err := rice.FindBox("templates")
 	if err != nil {
-		return nil, err
-	}
-	t := template.New("")
-	err = box.Walk("/", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() || !strings.HasSuffix(path, ".tmpl") {
-			return nil
-		}
-		str, err := box.String(path)
-		if err != nil {
-			return err
-		}
-		t, err = t.New(path).Parse(str)
 		return err
-	})
-	return t, err
+	}
+	if tmpl.Lookup(name) == nil {
+		str, err := box.String(name)
+		if err != nil {
+			return err
+		}
+		if tmpl, err = tmpl.New(name).Parse(str); err != nil {
+			return err
+		}
+	}
+	return tmpl.ExecuteTemplate(wr, name, data)
 }
