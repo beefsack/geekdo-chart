@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -11,9 +13,24 @@ func ChartJson(things []Thing) (graphs []byte, dataProvider []byte, err error) {
 	g := []map[string]interface{}{}
 	d := []map[string]interface{}{}
 	for _, t := range things {
+		var (
+			kind  string
+			id, n int
+		)
+		n, err = fmt.Sscanf(
+			strings.Replace(t.Id, ":", " ", -1),
+			"%s %d",
+			&kind,
+			&id,
+		)
+		if err != nil || n == 0 {
+			err = errors.New("could not get ID")
+			return
+		}
 		g = append(g, map[string]interface{}{
 			"title":      t.Name,
 			"valueField": t.Id,
+			"id":         id,
 		})
 		for _, r := range t.Ranks {
 			if r.Rank == 0 {

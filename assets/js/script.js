@@ -22,7 +22,7 @@ function makeChart(el, graphs, chartData) {
 	});
 }
 
-function initChartPage(graphs, dataProvider) {
+function initChartPage(graphs, dataProvider, kind) {
 	makeChart("chartdiv", graphs, dataProvider);
 	$('#thingChooser').select2({
 		width: '50%',
@@ -34,6 +34,7 @@ function initChartPage(graphs, dataProvider) {
 			quietMillis: 250,
 			data: function(term, page) {
 				return {
+					kinds: kind,
 					query: term
 				};
 			},
@@ -41,7 +42,7 @@ function initChartPage(graphs, dataProvider) {
 				return {
 					results: $.map(data, function(d) {
 						return {
-							id: d.type + ':' + d.id,
+							id: d.id,
 							text: d.name
 						};
 					})
@@ -53,7 +54,7 @@ function initChartPage(graphs, dataProvider) {
 			$(element).val('');
 			callback($.map(graphs, function(g) {
 				return {
-					id: g.valueField,
+					id: g.id,
 					text: g.title
 				};
 			}));
@@ -67,5 +68,5 @@ function submitChooseThingsForm(el) {
 		alert('Please select at least one item');
 		return;
 	}
-	document.location = '/' + val;
+	document.location = val;
 }

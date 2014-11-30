@@ -1,18 +1,6 @@
 package main
 
-import (
-	"fmt"
-	"time"
-)
-
-type Identifier struct {
-	Kind string
-	Id   int
-}
-
-func (i Identifier) Key() string {
-	return fmt.Sprintf("%s:%d", i.Kind, i.Id)
-}
+import "time"
 
 type Thing struct {
 	Id    string `gorethink:"id,omitempty"`
