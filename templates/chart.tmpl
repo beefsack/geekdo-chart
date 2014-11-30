@@ -1,0 +1,16 @@
+<html>
+<head>
+<script src="http://www.amcharts.com/lib/3/amcharts.js"></script>
+<script src="http://www.amcharts.com/lib/3/serial.js"></script>
+<script src="/assets/js/script.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function(event) {
+	makeChart("chartdiv", {{.Graphs}}, {{.DataProvider}});
+});
+</script>
+<link href="/assets/css/style.css" rel="stylesheet" type="text/css" media="all">
+</head>
+<body>
+<div id="chartdiv"></div>
+</body>
+</html>

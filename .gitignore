@@ -1,2 +1,3 @@
 *.swp
 rethinkdb_data
+*.rice-box.go

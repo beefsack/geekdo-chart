@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/GeertJohan/go.rice"
 	r "github.com/dancannon/gorethink"
 	"github.com/gorilla/mux"
 )
@@ -23,26 +24,48 @@ func main() {
 	if err := migrate(sess); err != nil {
 		log.Fatalf("Error migrating database, %v", err)
 	}
+	tmpl, err := parseTemplates()
+	if err != nil {
+		log.Fatalf("Error parsing templates, %v", err)
+	}
 	router := mux.NewRouter()
-	router.HandleFunc("/{kind}/{ids}", HandlerWithDB(sess, ChartHandler))
-	router.HandleFunc("/", HandlerWithDB(sess, HomeHandler))
+	router.Handle("/assets/{rest:.*}", http.StripPrefix("/assets/",
+		http.FileServer(rice.MustFindBox("assets").HTTPBox())))
+	router.HandleFunc("/{kind}/{ids}", Handler(sess, tmpl, ChartHandler))
+	router.HandleFunc("/", Handler(sess, tmpl, HomeHandler))
 	http.ListenAndServe(":3000", router)
 }
 
-func HandlerWithDB(
+func Handler(
 	sess *r.Session,
-	handler func(wr http.ResponseWriter, req *http.Request, sess *r.Session),
+	tmpl *template.Template,
+	handler func(
+		wr http.ResponseWriter,
+		req *http.Request,
+		sess *r.Session,
+		tmpl *template.Template,
+	),
 ) func(wr http.ResponseWriter, req *http.Request) {
 	return func(wr http.ResponseWriter, req *http.Request) {
-		handler(wr, req, sess)
+		handler(wr, req, sess, tmpl)
 	}
 }
 
-func HomeHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
+func HomeHandler(
+	wr http.ResponseWriter,
+	req *http.Request,
+	sess *r.Session,
+	tmpl *template.Template,
+) {
 	wr.Write([]byte(`<html><body><h1>Try <a href="/boardgame/154203,150376,147020,148228,157354,148949">this`))
 }
 
-func ChartHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
+func ChartHandler(
+	wr http.ResponseWriter,
+	req *http.Request,
+	sess *r.Session,
+	tmpl *template.Template,
+) {
 	var overallErr error
 	vars := mux.Vars(req)
 	kind := vars["kind"]
@@ -89,7 +112,7 @@ func ChartHandler(wr http.ResponseWriter, req *http.Request, sess *r.Session) {
 		wr.Write([]byte("Unable to generate chart data, possible because no ranks were available"))
 		return
 	}
-	parsedTemplate.Execute(wr, struct{ Graphs, DataProvider interface{} }{
+	tmpl.ExecuteTemplate(wr, "chart.tmpl", struct{ Graphs, DataProvider interface{} }{
 		Graphs:       template.JS(graphs),
 		DataProvider: template.JS(dataProvider),
 	})
