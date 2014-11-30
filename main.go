@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -82,11 +83,13 @@ func ChartHandler(
 	// Load from DB
 	things := []Thing{}
 	wg := sync.WaitGroup{}
+	failed := []int{}
 	for _, id := range ids {
 		wg.Add(1)
 		go func(id int) {
 			thing, err := LoadThing(kind, id, sess)
 			if err != nil {
+				failed = append(failed, id)
 				overallErr = err
 			}
 			things = append(things, thing)
@@ -95,9 +98,9 @@ func ChartHandler(
 	}
 	wg.Wait()
 	if overallErr != nil {
-		log.Printf("Error loading thing, %v", overallErr)
+		log.Printf("Error loading %s %v, %v", kind, failed, overallErr)
 		wr.WriteHeader(500)
-		wr.Write([]byte("Unable to load"))
+		wr.Write([]byte(fmt.Sprintf("Unable to load %v", failed)))
 		return
 	}
 	graphs, dataProvider, err := ChartJson(things)
