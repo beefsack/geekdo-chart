@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -33,9 +33,9 @@ func main() {
 	router := mux.NewRouter()
 	router.Handle("/assets/{rest:.*}", http.StripPrefix("/assets/",
 		http.FileServer(rice.MustFindBox("assets").HTTPBox())))
-	router.HandleFunc("/search/{query}", SearchHandler)
-	router.HandleFunc("/{kind}/{ids}", Handler(sess, tmpl, ChartHandler))
-	router.HandleFunc("/", Handler(sess, tmpl, HomeHandler))
+	router.HandleFunc("/search", SearchHandler)
+	router.HandleFunc("/{ids}", Handler(sess, tmpl, ChartHandler))
+	router.HandleFunc("/", HomeHandler)
 	http.ListenAndServe(":3000", router)
 }
 
@@ -54,13 +54,8 @@ func Handler(
 	}
 }
 
-func HomeHandler(
-	wr http.ResponseWriter,
-	req *http.Request,
-	sess *r.Session,
-	tmpl *template.Template,
-) {
-	wr.Write([]byte(`<html><body><h1>Try <a href="/boardgame/154203,150376,147020,148228,157354,148949">this`))
+func HomeHandler(wr http.ResponseWriter, req *http.Request) {
+	http.Redirect(wr, req, "/boardgame:154203,boardgame:150376,boardgame:147020,boardgame:148228,boardgame:157354,boardgame:148949", 302)
 }
 
 func ChartHandler(
@@ -71,14 +66,22 @@ func ChartHandler(
 ) {
 	var overallErr error
 	vars := mux.Vars(req)
-	kind := vars["kind"]
-	ids := []int{}
-	idMap := map[int]bool{} // Store which IDs have been parsed for uniqueness
+	ids := []Identifier{}
+	idMap := map[Identifier]bool{} // Store which IDs have been parsed for uniqueness
 	for _, idStr := range strings.Split(vars["ids"], ",") {
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
+		id := Identifier{}
+		n, err := fmt.Sscanf(
+			strings.Replace(idStr, ":", " ", -1),
+			"%s %d",
+			&id.Kind,
+			&id.Id,
+		)
+		if err != nil || n == 0 {
 			wr.WriteHeader(400)
-			wr.Write([]byte("All ids must be integers"))
+			wr.Write([]byte(fmt.Sprintf(
+				"Could not understand id %s, expect something like boardgame:12345",
+				idStr,
+			)))
 			return
 		}
 		if idMap[id] {
@@ -92,8 +95,8 @@ func ChartHandler(
 	wg := sync.WaitGroup{}
 	for _, id := range ids {
 		wg.Add(1)
-		go func(id int) {
-			thing, err := LoadThing(kind, id, sess)
+		go func(id Identifier) {
+			thing, err := LoadThing(id.Kind, id.Id, sess)
 			if err != nil {
 				overallErr = err
 			}
@@ -115,15 +118,18 @@ func ChartHandler(
 		wr.Write([]byte("Unable to generate chart data, possible because no ranks were available"))
 		return
 	}
-	tmpl.ExecuteTemplate(wr, "chart.tmpl", struct{ Graphs, DataProvider interface{} }{
+	tmpl.ExecuteTemplate(wr, "chart.tmpl", struct {
+		Graphs, DataProvider interface{}
+		Things               []Thing
+	}{
 		Graphs:       template.JS(graphs),
 		DataProvider: template.JS(dataProvider),
+		Things:       things,
 	})
 }
 
 func SearchHandler(wr http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	query := vars["query"]
+	query := req.URL.Query().Get("query")
 	if query == "" {
 		wr.WriteHeader(400)
 		wr.Write([]byte("You must provide a query"))

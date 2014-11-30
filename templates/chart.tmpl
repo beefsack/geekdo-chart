@@ -2,15 +2,22 @@
 <head>
 <script src="http://www.amcharts.com/lib/3/amcharts.js"></script>
 <script src="http://www.amcharts.com/lib/3/serial.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/select2/3.5.2/select2.min.js"></script>
 <script src="/assets/js/script.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function(event) {
-	makeChart("chartdiv", {{.Graphs}}, {{.DataProvider}});
+	initChartPage({{.Graphs}}, {{.DataProvider}});
 });
 </script>
+<link href="//cdnjs.cloudflare.com/ajax/libs/select2/3.5.2/select2.css" rel="stylesheet" type="text/css" media="all">
 <link href="/assets/css/style.css" rel="stylesheet" type="text/css" media="all">
 </head>
 <body>
+<form class="choose-things" onsubmit="submitChooseThingsForm(this);return false;">
+	<input id="thingChooser" type="hidden" value="one,two" />
+	<input type="submit">
+</form>
 <div id="chartdiv"></div>
 </body>
 </html>
